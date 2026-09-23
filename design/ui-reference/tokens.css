@@ -1,0 +1,82 @@
+/*
+ * Animosis Studio — design tokens
+ * Single source of truth for the patcher UI and every tool that follows.
+ * Contrast ratios are measured against --surface-base (#1A1A1A).
+ */
+
+:root {
+  /* ---- Brand red -------------------------------------------------------
+     Split across three luminances. A single "deep red" cannot carry a mark
+     AND text on a dark ground: #8B0000 on #1A1A1A is 1.7:1. */
+  --red-field-deepest: #1F0508;  /* icon field, deepest                    */
+  --red-field:         #2E0A10;  /* icon field                             */
+  --red-sunken:        #4A0E18;  /* pressed fill                           */
+  --red-line:          #B91919;  /* 2.7:1 — borders, rules. NOT for text.  */
+  --red-border:        #C41E3A;  /* 3.0:1 — brand red, borders, mark glow  */
+  --red-primary:       #E5484D;  /* 4.4:1 — primary actions, progress      */
+  --red-hover:         #FF4757;  /* 5.2:1 — hover                          */
+  --red-text:          #FF6B70;  /* 6.3:1 — links, red text on dark        */
+  --red-on-field:      #FF8A8F;  /* 7.7:1 — text sitting on --red-field    */
+
+  /* Text placed ON --red-primary. Near-black, not white: white on #E5484D
+     is only 3.2:1, which fails at button label sizes. */
+  --on-red:            #1A0508;
+
+  /* ---- Neutrals --------------------------------------------------------- */
+  --surface-rail:      #0F0F0F;  /* nav rail — darker than the body        */
+  --surface-sunken:    #111111;  /* log wells, inset areas                 */
+  --surface-base:      #1A1A1A;  /* app background                         */
+  --surface-raised:    #262626;  /* cards, list rows                       */
+  --surface-hover:     #303030;  /* hover, popovers                        */
+  --border-subtle:     #262626;
+  --border-default:    #3A3A3A;
+
+  --text-primary:      #EDEDED;  /* 15.0:1 */
+  --text-secondary:    #C4C4C4;  /*  9.8:1 */
+  --text-muted:        #9A9A9A;  /*  5.3:1 — the floor for any real text   */
+  --text-disabled:     #6E6E6E;  /*  2.6:1 — decorative only, never copy   */
+
+  /* ---- Status ----------------------------------------------------------
+     Red is the brand accent, so errors must NOT be red alone or a failed
+     patch looks like a primary button. Errors carry amber + an icon + a
+     left rule. See docs/patcher-protocol.md. */
+  --status-success:    #7FD69A;
+  --status-warn:       #E3BC5C;
+  --status-error:      #FFB224;
+  --status-info:       #6FA8DC;
+
+  /* ---- Chromium --------------------------------------------------------- */
+  --chrome-plate: linear-gradient(145deg,
+    #585858 0%, #2B2B2B 34%, #434343 51%, #1C1C1C 76%, #0C0C0C 100%);
+  --chrome-edge: rgba(255, 255, 255, 0.22);
+
+  /* ---- Type ------------------------------------------------------------
+     Source Sans 3 and JetBrains Mono, both SIL OFL 1.1 — bundled, not
+     fetched, so the patcher renders correctly with no network. Licence
+     files ship in THIRD-PARTY-NOTICES.txt. */
+  --font-sans: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+
+  --text-xs:   11px;
+  --text-sm:   13px;
+  --text-base: 14px;
+  --text-lg:   17px;
+  --text-xl:   22px;
+  --text-2xl:  30px;
+
+  /* ---- Space, radius, motion -------------------------------------------- */
+  --space-1: 4px;   --space-2: 8px;   --space-3: 12px;
+  --space-4: 16px;  --space-5: 22px;  --space-6: 32px;  --space-7: 48px;
+
+  --radius-sm: 5px; --radius-md: 7px; --radius-lg: 10px; --radius-icon: 22.5%;
+
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+}
+
+/* The patcher is dark-only by design — it is chrome around a download, not
+   a document. Respect reduced motion regardless. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur-base: 0ms; }
+}

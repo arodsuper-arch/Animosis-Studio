@@ -1,0 +1,56 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Generated from design/tokens.css. That file stays the source of truth;
+       these are its XAML counterparts. Contrast ratios are against SurfaceBase. -->
+
+  <!-- Brand red, split across three luminances. A single deep red cannot carry
+       both a mark and text on a dark ground. -->
+  <SolidColorBrush x:Key="RedField"      Color="#2E0A10" />
+  <SolidColorBrush x:Key="RedSunken"     Color="#4A0E18" />
+  <SolidColorBrush x:Key="RedBorder"     Color="#C41E3A" />
+  <SolidColorBrush x:Key="RedPrimary"    Color="#E5484D" />
+  <SolidColorBrush x:Key="RedHover"      Color="#FF4757" />
+  <SolidColorBrush x:Key="RedText"       Color="#FF6B70" />
+  <SolidColorBrush x:Key="RedOnField"    Color="#FF8A8F" />
+  <SolidColorBrush x:Key="OnRed"         Color="#1A0508" />
+
+  <!-- Neutrals -->
+  <SolidColorBrush x:Key="SurfaceRail"   Color="#0F0F0F" />
+  <SolidColorBrush x:Key="SurfaceSunken" Color="#111111" />
+  <SolidColorBrush x:Key="SurfaceBase"   Color="#1A1A1A" />
+  <SolidColorBrush x:Key="SurfaceRaised" Color="#262626" />
+  <SolidColorBrush x:Key="SurfaceHover"  Color="#303030" />
+  <SolidColorBrush x:Key="BorderSubtle"  Color="#262626" />
+  <SolidColorBrush x:Key="BorderDefault" Color="#3A3A3A" />
+
+  <SolidColorBrush x:Key="TextPrimary"   Color="#EDEDED" />
+  <SolidColorBrush x:Key="TextSecondary" Color="#C4C4C4" />
+  <SolidColorBrush x:Key="TextMuted"     Color="#9A9A9A" />
+  <SolidColorBrush x:Key="TextDisabled"  Color="#6E6E6E" />
+
+  <!-- Status. Errors are amber, never red: red is the brand accent and the
+       primary button, so a failure must not look like an action. -->
+  <SolidColorBrush x:Key="StatusSuccess" Color="#7FD69A" />
+  <SolidColorBrush x:Key="StatusWarn"    Color="#E3BC5C" />
+  <SolidColorBrush x:Key="StatusError"   Color="#FFB224" />
+
+  <!-- Chromium -->
+  <LinearGradientBrush x:Key="ChromePlate" StartPoint="0%,0%" EndPoint="60%,100%">
+    <GradientStop Color="#585858" Offset="0.0" />
+    <GradientStop Color="#2B2B2B" Offset="0.34" />
+    <GradientStop Color="#434343" Offset="0.51" />
+    <GradientStop Color="#1C1C1C" Offset="0.76" />
+    <GradientStop Color="#0C0C0C" Offset="1.0" />
+  </LinearGradientBrush>
+
+  <LinearGradientBrush x:Key="ProgressFill" StartPoint="0%,0%" EndPoint="100%,0%">
+    <GradientStop Color="#A50F2D" Offset="0.0" />
+    <GradientStop Color="#E5484D" Offset="1.0" />
+  </LinearGradientBrush>
+
+  <!-- Source Sans 3, SIL OFL 1.1, bundled rather than CDN-fetched so the client
+       renders correctly with no network. OFL.txt ships beside the .ttf. -->
+  <FontFamily x:Key="FontSans">avares://Animosis/Assets/Fonts/SourceSans3.ttf#Source Sans 3</FontFamily>
+
+</ResourceDictionary>

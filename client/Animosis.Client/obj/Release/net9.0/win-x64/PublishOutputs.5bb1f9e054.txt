@@ -1,0 +1,5 @@
+S:\Animosis Studio\Animosis Studio\client\Animosis.Client\bin\Release\net9.0\win-x64\publish\Animosis.pdb
+S:\Animosis Studio\Animosis Studio\client\Animosis.Client\bin\Release\net9.0\win-x64\publish\libHarfBuzzSharp.pdb
+S:\Animosis Studio\Animosis Studio\client\Animosis.Client\bin\Release\net9.0\win-x64\publish\libSkiaSharp.pdb
+S:\Animosis Studio\Animosis Studio\client\Animosis.Client\bin\Release\net9.0\win-x64\publish\Animosis.Updater.pdb
+S:\Animosis Studio\Animosis Studio\client\Animosis.Client\bin\Release\net9.0\win-x64\publish\Animosis.exe

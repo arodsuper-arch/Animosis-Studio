@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://animosis.studio/schema/manifest/1",
+  "title": "Animosis release manifest",
+  "description": "The signed document a patcher fetches to learn what a channel currently contains. It is the ONLY document that is signed; every artifact is authenticated by a SHA-256 recorded here, so one signature covers the whole release. See docs/patcher-protocol.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "product", "channel", "version", "serial", "released", "baseUrl", "packages"],
+
+  "properties": {
+    "schema": {
+      "const": 1,
+      "description": "Manifest format version. A patcher that does not know this value must refuse the manifest and tell the user to update, never guess."
+    },
+    "product": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Stable product slug, e.g. 'animosis-studio'."
+    },
+    "channel": {
+      "type": "string",
+      "enum": ["stable", "beta", "nightly"],
+      "description": "Channels are independent timelines. A 'serial' is only comparable within one channel."
+    },
+    "version": {
+      "$ref": "#/$defs/version",
+      "description": "Human-facing release version. Display only — ordering decisions use 'serial'."
+    },
+    "serial": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonically increasing within a channel. A client MUST refuse a manifest whose serial is lower than the highest it has accepted, which is what stops an attacker replaying an old signed manifest to force a downgrade onto a patched vulnerability. Never reuse or reorder a serial."
+    },
+    "released": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Informational only. Clocks are attacker-influenced and skew legitimately; 'serial' is the ordering authority."
+    },
+    "minPatcher": {
+      "$ref": "#/$defs/version",
+      "description": "Oldest patcher that can apply this release. A patcher below this MUST self-update before touching any package."
+    },
+    "baseUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://",
+      "description": "Artifact URLs resolve against this. Keeping it here rather than in each artifact means a CDN move is one line, and the signed document stays portable. HTTPS is mandatory: TLS is not the integrity guarantee (the signature is) but it stops passive observation of what a user is installing."
+    },
+    "notes": {
+      "type": "string",
+      "format": "uri",
+      "description": "Release notes URL, opened in the user's browser — never rendered inside the patcher, which would make signed-but-hostile HTML an attack surface."
+    },
+    "packages": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/package" }
+    }
+  },
+
+  "$defs": {
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z-.]+)?$",
+      "description": "Semver 2.0, without build metadata."
+    },
+
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Lowercase hex. Verified over the bytes as downloaded, before any decompression — a decompressor fed unverified input is a parser fed attacker data."
+    },
+
+    "platform": {
+      "type": "string",
+      "enum": ["any", "win-x64", "win-arm64", "linux-x64", "linux-arm64", "macos-x64", "macos-arm64"],
+      "description": "'any' means platform-independent content (schemas, configs, docs)."
+    },
+
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "size", "sha256"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Resolved against baseUrl. Relative, and MUST NOT contain '..' or a leading '/' — a client rejects the manifest outright if it does."
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Exact byte count. Used for the progress bar AND as a hard cap: a client stops reading once it exceeds this, so a hostile CDN cannot stream an unbounded body at a disk."
+        },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "unpackedSize": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Bytes after decompression. Checked against free disk space before starting, and enforced during unpack to bound decompression bombs."
+        }
+      }
+    },
+
+    "delta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "format", "url", "size", "sha256", "resultSha256"],
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/version",
+          "description": "The installed version this patch applies to. A client uses a delta ONLY when its recorded local version matches exactly."
+        },
+        "format": {
+          "type": "string",
+          "enum": ["zstd-patch"],
+          "description": "zstd --patch-from. Zstandard is BSD-3-Clause (dual GPLv2; take BSD-3) — no commercial restriction, no patent grant needed."
+        },
+        "url": { "type": "string" },
+        "size": { "type": "integer", "minimum": 0 },
+        "sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Hash of the patch file itself."
+        },
+        "resultSha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Hash of the artifact AFTER the patch is applied. Non-negotiable: it must equal the full artifact's sha256, which is what proves the delta path and the full-download path converge on identical bytes. Mismatch means discard and fall back to the full download."
+        }
+      }
+    },
+
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "platform", "installPath", "artifact"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(\\.[a-z0-9-]+)+$",
+          "description": "Reverse-dotted, e.g. 'animosis.core', 'animosis.terrain'. Stable forever — this is the identity the local state file keys on."
+        },
+        "version": { "$ref": "#/$defs/version" },
+        "platform": { "$ref": "#/$defs/platform" },
+        "required": {
+          "type": "boolean",
+          "default": true,
+          "description": "false marks an optional component the user can decline (sample content, debug symbols)."
+        },
+        "installPath": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9_./-]*$",
+          "description": "Destination relative to the install root. Must not escape it: no leading '/', no '..'. Enforced by the client, not trusted from here."
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Package ids that must be installed at or above their listed version first. The graph must be acyclic; a client that detects a cycle refuses the manifest."
+        },
+        "artifact": { "$ref": "#/$defs/artifact" },
+        "deltas": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/delta" },
+          "default": [],
+          "description": "Optional fast paths. Every delta is an optimisation only — the full artifact must always remain downloadable, so a client can always recover."
+        }
+      }
+    }
+  }
+}

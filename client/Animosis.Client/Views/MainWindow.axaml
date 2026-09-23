@@ -1,0 +1,368 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Animosis.Client.ViewModels"
+        xmlns:m="using:Animosis.Client.Models"
+        xmlns:sys="using:System"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1120" d:DesignHeight="720"
+        x:Class="Animosis.Client.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="Animosis"
+        Icon="/Assets/animosis.ico"
+        Width="1120" Height="720"
+        MinWidth="900" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        WindowDecorations="None"
+        Background="{StaticResource SurfaceBase}"
+        FontFamily="{StaticResource FontSans}">
+
+  <Design.DataContext>
+    <vm:MainViewModel />
+  </Design.DataContext>
+
+  <Window.Styles>
+    <!-- Nav rail items -->
+    <Style Selector="Button.nav">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="Height" Value="70" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Button.nav:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#1C1C1C" />
+    </Style>
+
+    <!-- Window controls -->
+    <Style Selector="Button.win">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="Width" Value="46" />
+      <Setter Property="Height" Value="40" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+    </Style>
+    <Style Selector="Button.win:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource SurfaceHover}" />
+    </Style>
+    <Style Selector="Button.close:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#C1272D" />
+    </Style>
+
+    <!-- Actions -->
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{StaticResource RedPrimary}" />
+      <Setter Property="Foreground" Value="{StaticResource OnRed}" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Padding" Value="18,8" />
+      <Setter Property="CornerRadius" Value="5" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource RedHover}" />
+      <Setter Property="Foreground" Value="{StaticResource OnRed}" />
+    </Style>
+
+    <Style Selector="Button.ghost">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondary}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Padding" Value="18,8" />
+      <Setter Property="CornerRadius" Value="5" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="{StaticResource BorderDefault}" />
+    </Style>
+    <Style Selector="Button.ghost:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource SurfaceHover}" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+    </Style>
+
+    <Style Selector="ProgressBar">
+      <Setter Property="Background" Value="#2A2A2A" />
+      <Setter Property="Foreground" Value="{StaticResource ProgressFill}" />
+      <Setter Property="Height" Value="7" />
+      <Setter Property="MinHeight" Value="7" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+
+    <Style Selector="TextBlock.log">
+      <Setter Property="FontFamily" Value="Consolas, monospace" />
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="Foreground" Value="{StaticResource TextDisabled}" />
+      <Setter Property="Margin" Value="0,0,0,4" />
+    </Style>
+  </Window.Styles>
+
+  <Border BorderBrush="{StaticResource BorderDefault}" BorderThickness="1">
+    <DockPanel>
+
+      <!-- ================= Title bar ================= -->
+      <Border DockPanel.Dock="Top" Height="40"
+              Background="{StaticResource SurfaceRail}"
+              BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,0,0,1"
+              PointerPressed="TitleBar_PointerPressed">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10"
+                      Margin="12,0,0,0" VerticalAlignment="Center">
+            <!-- The mark: chromium plate, dark-red AS set in Source Sans 3,
+                 matching the tool plates and the generated .ico. -->
+            <Border Width="22" Height="22" CornerRadius="5"
+                    Background="{StaticResource ChromePlate}">
+              <TextBlock Text="AS" FontSize="10.5" FontWeight="SemiBold"
+                         Foreground="{StaticResource RedBorder}"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <TextBlock Text="Animosis" FontSize="13" FontWeight="SemiBold"
+                       Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="2" Orientation="Horizontal">
+            <Button Classes="win" Click="Minimize_Click">
+              <Path Data="M 0 0 H 10" Stroke="{StaticResource TextMuted}" StrokeThickness="1"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Button>
+            <Button Classes="win close" Click="Close_Click">
+              <Path Data="M 0 0 L 10 10 M 10 0 L 0 10" Stroke="{StaticResource TextMuted}"
+                    StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Button>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Grid ColumnDefinitions="84,*">
+
+        <!-- ================= Nav rail ================= -->
+        <Border Grid.Column="0" Background="{StaticResource SurfaceRail}"
+                BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,0,1,0">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Top">
+
+              <Button Classes="nav" Command="{Binding SelectPageCommand}" CommandParameter="0">
+                <Grid>
+                  <Border Width="3" HorizontalAlignment="Left"
+                          Background="{StaticResource RedPrimary}" Opacity="{Binding LibraryBar}" />
+                  <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                              Spacing="6" Opacity="{Binding LibraryOpacity}">
+                    <Path Width="19" Height="19" Stretch="Uniform"
+                          Stroke="{StaticResource TextPrimary}" StrokeThickness="1.6"
+                          HorizontalAlignment="Center"
+                          Data="M3,3 H10 V10 H3 Z M14,3 H21 V10 H14 Z M3,14 H10 V21 H3 Z M14,14 H21 V21 H14 Z" />
+                    <TextBlock Text="Library" FontSize="11"
+                               Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" />
+                  </StackPanel>
+                </Grid>
+              </Button>
+
+              <Button Classes="nav" Command="{Binding SelectPageCommand}" CommandParameter="1">
+                <Grid>
+                  <Border Width="3" HorizontalAlignment="Left"
+                          Background="{StaticResource RedPrimary}" Opacity="{Binding UpdatesBar}" />
+                  <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                              Spacing="6" Opacity="{Binding UpdatesOpacity}">
+                    <Grid Width="19" Height="19" HorizontalAlignment="Center">
+                      <Path Stretch="Uniform" Stroke="{StaticResource TextPrimary}" StrokeThickness="1.6"
+                            Data="M12,3 V15 M7,10.5 L12,15.5 L17,10.5 M4,20 H20" />
+                      <Border Width="7" Height="7" CornerRadius="4"
+                              Background="{StaticResource RedPrimary}"
+                              HorizontalAlignment="Right" VerticalAlignment="Top"
+                              Margin="0,-2,-3,0" IsVisible="{Binding CanInstall}" />
+                    </Grid>
+                    <TextBlock Text="Updates" FontSize="11"
+                               Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" />
+                  </StackPanel>
+                </Grid>
+              </Button>
+
+              <Button Classes="nav" Command="{Binding SelectPageCommand}" CommandParameter="2">
+                <Grid>
+                  <Border Width="3" HorizontalAlignment="Left"
+                          Background="{StaticResource RedPrimary}" Opacity="{Binding SettingsBar}" />
+                  <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                              Spacing="6" Opacity="{Binding SettingsOpacity}">
+                    <Path Width="19" Height="19" Stretch="Uniform"
+                          Stroke="{StaticResource TextPrimary}" StrokeThickness="1.6"
+                          HorizontalAlignment="Center"
+                          Data="M3,7 H21 M3,17 H21 M9,4 V10 M15,14 V20" />
+                    <TextBlock Text="Settings" FontSize="11"
+                               Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" />
+                  </StackPanel>
+                </Grid>
+              </Button>
+
+            </StackPanel>
+
+            <TextBlock DockPanel.Dock="Bottom" Text="{Binding ClientVersion}"
+                       FontSize="10" Foreground="{StaticResource TextDisabled}"
+                       HorizontalAlignment="Center" Margin="0,0,0,12" />
+          </DockPanel>
+        </Border>
+
+        <!-- ================= Content ================= -->
+        <Grid Grid.Column="1" RowDefinitions="Auto,*">
+
+          <StackPanel Grid.Row="0" Margin="32,30,32,0" Spacing="4">
+            <TextBlock Text="{Binding PageTitle}" FontSize="27" FontWeight="SemiBold"
+                       Foreground="{StaticResource TextPrimary}" />
+            <TextBlock Text="{Binding PageSubtitle}" FontSize="14"
+                       Foreground="{StaticResource TextMuted}" />
+          </StackPanel>
+
+          <!-- Library -->
+          <ScrollViewer Grid.Row="1" IsVisible="{Binding IsLibrary}"
+                        Margin="32,24,20,20" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Tools}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="m:ToolItem">
+                  <Border Width="320" Height="172" Margin="0,0,16,16" Padding="16"
+                          CornerRadius="10"
+                          Background="{StaticResource SurfaceRaised}"
+                          BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1">
+                    <DockPanel>
+
+                      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12">
+                        <Border Width="46" Height="46" CornerRadius="11"
+                                Background="{StaticResource ChromePlate}">
+                          <TextBlock Text="{Binding Initials}" FontSize="15" FontWeight="Bold"
+                                     Foreground="{StaticResource RedOnField}"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel VerticalAlignment="Center" Spacing="3">
+                          <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold"
+                                     Foreground="{StaticResource TextPrimary}" />
+                          <StackPanel Orientation="Horizontal" Spacing="7">
+                            <Border Width="6" Height="6" CornerRadius="3" VerticalAlignment="Center"
+                                    Background="{StaticResource RedPrimary}"
+                                    IsVisible="{Binding IsUpdateAvailable}" />
+                            <TextBlock Text="{Binding StatusText}" FontSize="12"
+                                       Foreground="{StaticResource TextMuted}" />
+                          </StackPanel>
+                        </StackPanel>
+                      </StackPanel>
+
+                      <Button DockPanel.Dock="Bottom" Classes="primary"
+                              Content="{Binding ActionText}" HorizontalAlignment="Right"
+                              Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).ToolActionCommand}"
+                              CommandParameter="{Binding}" />
+
+                      <TextBlock Text="{Binding Blurb}" TextWrapping="Wrap" FontSize="13"
+                                 LineHeight="19" Margin="0,13,0,0" VerticalAlignment="Top"
+                                 Foreground="{StaticResource TextSecondary}" />
+                    </DockPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+
+          <!-- Updates -->
+          <StackPanel Grid.Row="1" IsVisible="{Binding IsUpdates}"
+                      Margin="32,24,32,24" Spacing="16">
+
+            <Border CornerRadius="10" Padding="22"
+                    Background="{StaticResource SurfaceRaised}"
+                    BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1">
+              <StackPanel Spacing="16">
+
+                <StackPanel Spacing="5">
+                  <TextBlock Text="{Binding UpdateHeadline}" FontSize="18" FontWeight="SemiBold"
+                             Foreground="{StaticResource TextPrimary}" />
+                  <TextBlock Text="{Binding UpdateSubline}" FontSize="13.5" TextWrapping="Wrap"
+                             Foreground="{StaticResource TextSecondary}" />
+                </StackPanel>
+
+                <ProgressBar Value="{Binding ProgressPercent}" Maximum="100"
+                             IsIndeterminate="{Binding IsIndeterminate}"
+                             IsVisible="{Binding ShowProgress}" />
+
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0" Text="{Binding ProgressDetail}" FontSize="13"
+                             Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="{Binding ProgressNumbers}" FontSize="12.5"
+                             FontFamily="Consolas, monospace"
+                             Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" />
+                </Grid>
+
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                  <TextBlock Grid.Column="0" Text="{Binding SignatureText}" FontSize="12"
+                             Foreground="{StaticResource StatusSuccess}" VerticalAlignment="Center" />
+                  <Button Grid.Column="1" Classes="ghost" Content="Check again" Margin="0,0,8,0"
+                          Command="{Binding RecheckCommand}" />
+                  <Button Grid.Column="2" Classes="ghost" Content="Cancel" Margin="0,0,8,0"
+                          IsVisible="{Binding CanCancel}" Command="{Binding CancelCommand}" />
+                  <Button Grid.Column="3" Classes="primary" Content="Install"
+                          IsVisible="{Binding CanInstall}" Command="{Binding InstallCommand}" />
+                </Grid>
+
+              </StackPanel>
+            </Border>
+
+            <Border CornerRadius="10" Padding="16" Height="150"
+                    Background="{StaticResource SurfaceSunken}"
+                    BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Log}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="sys:String">
+                      <TextBlock Classes="log" Text="{Binding}" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </Border>
+
+          </StackPanel>
+
+          <!-- Settings -->
+          <StackPanel Grid.Row="1" IsVisible="{Binding IsSettings}"
+                      Margin="32,24,32,24" Spacing="12">
+
+            <Border CornerRadius="10" Padding="18" Background="{StaticResource SurfaceRaised}"
+                    BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1">
+              <StackPanel Spacing="4">
+                <TextBlock Text="Install location" FontSize="13" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextPrimary}" />
+                <TextBlock Text="{Binding InstallPath}" FontSize="12.5"
+                           FontFamily="Consolas, monospace" Foreground="{StaticResource TextMuted}" />
+              </StackPanel>
+            </Border>
+
+            <Border CornerRadius="10" Padding="18" Background="{StaticResource SurfaceRaised}"
+                    BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1">
+              <StackPanel Spacing="4">
+                <TextBlock Text="Release channel" FontSize="13" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextPrimary}" />
+                <TextBlock Text="stable — verified releases only" FontSize="12.5"
+                           Foreground="{StaticResource TextMuted}" />
+              </StackPanel>
+            </Border>
+
+            <Border CornerRadius="10" Padding="18" Background="{StaticResource SurfaceRaised}"
+                    BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1">
+              <StackPanel Spacing="4">
+                <TextBlock Text="Signing key" FontSize="13" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextPrimary}" />
+                <TextBlock Text="ed25519 · 2026a, 2027a pinned" FontSize="12.5"
+                           FontFamily="Consolas, monospace" Foreground="{StaticResource TextMuted}" />
+              </StackPanel>
+            </Border>
+
+          </StackPanel>
+
+        </Grid>
+      </Grid>
+    </DockPanel>
+  </Border>
+</Window>

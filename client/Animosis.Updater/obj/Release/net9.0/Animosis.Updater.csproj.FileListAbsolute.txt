@@ -1,0 +1,12 @@
+S:\Animosis Studio\Animosis Studio\client\Animosis.Updater\bin\Release\net9.0\Animosis.Updater.deps.json
+S:\Animosis Studio\Animosis Studio\client\Animosis.Updater\bin\Release\net9.0\Animosis.Updater.dll
+S:\Animosis Studio\Animosis Studio\client\Animosis.Updater\bin\Release\net9.0\Animosis.Updater.pdb
+S:\Animosis Studio\Animosis Studio\client\Animosis.Updater\obj\Release\net9.0\Animosis.Updater.GeneratedMSBuildEditorConfig.editorconfig
+S:\Animosis Studio\Animosis Studio\client\Animosis.Updater\obj\Release\net9.0\Animosis.Updater.AssemblyInfoInputs.cache
+S:\Animosis Studio\Animosis Studio\client\Animosis.Updater\obj\Release\net9.0\Animosis.Updater.AssemblyInfo.cs
+S:\Animosis Studio\Animosis Studio\client\Animosis.Updater\obj\Release\net9.0\Animosis.Updater.csproj.CoreCompileInputs.cache
+S:\Animosis Studio\Animosis Studio\client\Animosis.Updater\obj\Release\net9.0\Animosis.Updater.sourcelink.json
+S:\Animosis Studio\Animosis Studio\client\Animosis.Updater\obj\Release\net9.0\Animosis.Updater.dll
+S:\Animosis Studio\Animosis Studio\client\Animosis.Updater\obj\Release\net9.0\refint\Animosis.Updater.dll
+S:\Animosis Studio\Animosis Studio\client\Animosis.Updater\obj\Release\net9.0\Animosis.Updater.pdb
+S:\Animosis Studio\Animosis Studio\client\Animosis.Updater\obj\Release\net9.0\ref\Animosis.Updater.dll

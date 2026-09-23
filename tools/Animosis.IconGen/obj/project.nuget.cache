@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "Zi+zCRApjFc=",
+  "success": true,
+  "projectFilePath": "S:\\Animosis Studio\\Animosis Studio\\tools\\Animosis.IconGen\\Animosis.IconGen.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\donut\\.nuget\\packages\\skiasharp\\3.119.1\\skiasharp.3.119.1.nupkg.sha512",
+    "C:\\Users\\donut\\.nuget\\packages\\skiasharp.nativeassets.macos\\3.119.1\\skiasharp.nativeassets.macos.3.119.1.nupkg.sha512",
+    "C:\\Users\\donut\\.nuget\\packages\\skiasharp.nativeassets.win32\\3.119.1\\skiasharp.nativeassets.win32.3.119.1.nupkg.sha512"
+  ],
+  "logs": []
+}
