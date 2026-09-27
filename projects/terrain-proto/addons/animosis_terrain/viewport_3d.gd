@@ -265,8 +265,7 @@ func _gui_input(event: InputEvent) -> void:
 				if mod < 0:
 					water.clear_body(water.selected_id)
 				else:
-					var n: int = water.fill(_cursor, water.selected_id)
-					_set_fill_report(n)
+					last_fill_cells = water.fill(_cursor, water.selected_id)
 				water_changed.emit()
 				accept_event()
 				return
@@ -530,18 +529,30 @@ func terrain_height_range() -> Vector2:
 	return r
 
 
-## Cells are 2 m square, so the count converts straight to an area.
-func _set_fill_report(cells: int) -> void:
-	last_fill_cells = cells
-
-
+## Footprint cells are 8 m square, so a count converts straight to an area.
 var last_fill_cells: int = 0
+
+
+func last_fill_area_km2() -> float:
+	return float(last_fill_cells) * 64.0 / 1.0e6
+
+
+func last_fill_capped() -> bool:
+	return water.last_fill_capped if water else false
 
 
 func refill_water(id: int) -> void:
 	if water:
 		last_fill_cells = water.refill(id)
 		water_changed.emit()
+
+
+func water_fill_report() -> String:
+	if last_fill_cells <= 0:
+		return "nothing filled -- the level is below the ground here"
+	if last_fill_capped():
+		return "%.2f km2 -- stopped at the limit, lower the level" % last_fill_area_km2()
+	return "%.2f km2" % last_fill_area_km2()
 
 
 func water_label(world: Vector3) -> String:

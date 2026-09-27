@@ -355,6 +355,7 @@ func _viewport_area() -> Control:
 	_view.edit_applied.connect(_on_edit_applied)
 	_view.brush_changed.connect(_on_brush_changed)
 	_view.water_changed.connect(_sync_level_slider)
+	_view.water_changed.connect(_report_fill)
 
 	# Floating toolbar, sitting over the viewport as Noggit's does.
 	var float_bar := _panel(Color(0.06, 0.06, 0.06, 0.92), BORDER_DEFAULT, Vector4i(1, 1, 1, 1), 8)
@@ -1010,6 +1011,13 @@ func _update_water_hint(fill: bool) -> void:
 		c.queue_free()
 	_water_notes.add_child(_section("Water"))
 	_water_notes.add_child(_note_block(_water_rows_for(fill), WATER_NOTE))
+
+
+## A fill can be capped or can land on dry ground, and a console warning is not
+## somewhere anyone looks. It goes where the result of the click belongs.
+func _report_fill() -> void:
+	if _view and _current_tool == Sculpt.Tool.WATER and _view.water_fill_mode:
+		_set_status("scale", _view.water_fill_report())
 
 
 func _selected_body() -> int:

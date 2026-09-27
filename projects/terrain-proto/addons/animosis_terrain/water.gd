@@ -76,6 +76,10 @@ const INITIAL_DEPTH_M := 2.0
 ## editor while it happens. 120,000 cells is 7.7 km2 -- half a 4 km region.
 const FILL_CELL_BUDGET := 120000
 
+## How far a fill will walk downhill looking for the floor of a basin, in
+## footprint cells. 400 steps is 3.2 km, further than any basin in a 4 km region.
+const DESCENT_LIMIT := 400
+
 
 ## One water volume. `level` is the surface height in world metres, and it is
 ## the only thing that decides where this body's water reaches.
@@ -127,6 +131,7 @@ var _used: Dictionary = {}
 var _dirty: Dictionary = {}
 var _bounds: Dictionary = {}      ## chunk index -> Vector4i scan box
 var _clat: PackedFloat32Array     ## coarse corner heights for the chunk being meshed
+var _fh: PackedFloat32Array       ## fine corner heights for one shoreline block
 var _verts: PackedVector3Array    ## scratch, reused across chunks
 var _cols: PackedColorArray
 var _suppress := false
@@ -135,6 +140,10 @@ var _suppress := false
 ## passability layer: writes are cheap and must not be throttled, meshing is not
 ## and must be.
 var last_op_ms: float = 1.0
+
+## True when the last fill stopped at its budget, which means the level sits
+## above the ground surrounding it and the water had nowhere to stop.
+var last_fill_capped := false
 
 
 func _init() -> void:
@@ -191,6 +200,9 @@ func configure(terrain, extent_m: float) -> void:
 
 	_clat = PackedFloat32Array()
 	_clat.resize((FOOT_PER_CHUNK + 1) * (FOOT_PER_CHUNK + 1))
+
+	_fh = PackedFloat32Array()
+	_fh.resize((MESH_PER_FOOT + 1) * (MESH_PER_FOOT + 1))
 
 	for m in _meshes.values():
 		(m as Node).queue_free()
@@ -352,13 +364,22 @@ func fill(world: Vector3, id: int) -> int:
 		return 0
 
 	_data_ref = _terrain.get("data") if _terrain != null else null
+
+	# Walk downhill first. A click states WHERE, not how high, and taking the
+	# level from the clicked point floods everything below it -- which on any
+	# slope is most of the region, because a level surface two metres above a
+	# hillside really would cover all the ground under it. Descending means a
+	# click anywhere on the sides of a valley makes the lake in the valley,
+	# which is what the gesture means. An already-levelled body descends only
+	# until it reaches ground its surface covers.
+	var at := _descend_to_sink(world, -INF if b.auto_level and not b.levelled else b.level)
 	if b.auto_level and not b.levelled:
-		b.level = _height(world.x, world.z) + INITIAL_DEPTH_M
+		b.level = at.y + INITIAL_DEPTH_M
 		b.levelled = true
-	b.seed_at = world
+	b.seed_at = at
 	b.seeded = true
 
-	var start := _index(world)
+	var start := _index(at)
 	if start < 0:
 		return 0
 
@@ -430,6 +451,7 @@ func fill(world: Vector3, id: int) -> int:
 						x += 1
 				x += 1
 
+	last_fill_capped = capped
 	if capped:
 		push_warning("Animosis Terrain: water fill hit its budget; the level is above the ground around it.")
 	if count == 0:
@@ -438,6 +460,54 @@ func fill(world: Vector3, id: int) -> int:
 	_mark_region(gx0, gz0, gx1, gz1, true)
 	_flush_dirty()
 	return count
+
+
+## Height at the centre of one footprint cell.
+func _cell_height(x: int, z: int) -> float:
+	var half := _extent * 0.5
+	return _height(-half + (float(x) + 0.5) * FOOT_M, -half + (float(z) + 0.5) * FOOT_M)
+
+
+## Steepest descent from a point to the floor of whatever basin holds it, or to
+## the first ground the given surface already covers.
+##
+## Greedy and eight-connected, so on noisy ground it can settle in a small pit
+## rather than the true low point. That is the right failure: a small pit gives
+## a small lake the Level slider can grow, where the alternative -- levelling
+## from wherever the cursor happened to be -- gives a flood.
+func _descend_to_sink(world: Vector3, stop_below: float) -> Vector3:
+	var half := _extent * 0.5
+	var x := int(floorf((world.x + half) / FOOT_M))
+	var z := int(floorf((world.z + half) / FOOT_M))
+	if x < 0 or z < 0 or x >= _cells or z >= _cells:
+		return world
+
+	var h := _cell_height(x, z)
+	for _step in DESCENT_LIMIT:
+		if h < stop_below:
+			break
+		var bx := x
+		var bz := z
+		var bh := h
+		for dz in range(-1, 2):
+			for dx in range(-1, 2):
+				var nx := x + dx
+				var nz := z + dz
+				if nx < 0 or nz < 0 or nx >= _cells or nz >= _cells:
+					continue
+				var nh := _cell_height(nx, nz)
+				if nh < bh:
+					bh = nh
+					bx = nx
+					bz = nz
+		if bx == x and bz == z:
+			break     # a sink: nothing around it is lower
+		x = bx
+		z = bz
+		h = bh
+
+	return Vector3(-half + (float(x) + 0.5) * FOOT_M, h,
+		-half + (float(z) + 0.5) * FOOT_M)
 
 
 ## Wetness of one footprint cell, sampled at its centre and remembered. The memo
@@ -570,11 +640,12 @@ func _emit_fine(fi: int, fj: int, ox: float, oz: float, lvl: float, c: Color) ->
 	var bz := oz + float(fj) * FOOT_M
 	var m := MESH_PER_FOOT
 
-	# Corners of the block, (m+1) square. Sampled per block rather than cached
-	# across the chunk: neighbouring blocks re-sample a shared edge, which costs
-	# a handful of lookups against the bookkeeping a chunk-wide cache would need.
-	var fh := PackedFloat32Array()
-	fh.resize((m + 1) * (m + 1))
+	# Corners of the block, (m+1) square, into a buffer that outlives the call.
+	# Sampled per block rather than cached across the chunk: neighbouring blocks
+	# re-sample a shared edge, which costs a handful of lookups against the
+	# bookkeeping a chunk-wide cache would need. A shallow lake is almost all
+	# shoreline, so allocating this per block was thousands of allocations.
+	var fh := _fh
 	for jj in m + 1:
 		var wz := bz + float(jj) * MESH_M
 		var base := jj * (m + 1)
@@ -618,6 +689,26 @@ func _quad(p00: Vector3, p10: Vector3, p11: Vector3, p01: Vector3,
 	_cols.push_back(c00)
 	_cols.push_back(c11)
 	_cols.push_back(c01)
+
+
+func _chunk_node(ci: int) -> MeshInstance3D:
+	var mi: MeshInstance3D = _meshes.get(ci)
+	if mi != null:
+		return mi
+	mi = MeshInstance3D.new()
+	mi.name = "WaterChunk%d" % ci
+	mi.material_override = _material
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Flat in XZ, but it can sit anywhere in the region's vertical range, which
+	# Godot cannot infer cheaply from the vertices alone.
+	var half := _extent * 0.5
+	mi.custom_aabb = AABB(
+		Vector3(-half + float(ci % _chunks) * CHUNK_M, -2000.0,
+			-half + float(ci / _chunks) * CHUNK_M),
+		Vector3(CHUNK_M, 4000.0, CHUNK_M))
+	add_child(mi)
+	_meshes[ci] = mi
+	return mi
 
 
 ## Meshes one 128 m chunk of surface, coarse where it can be and fine where it
