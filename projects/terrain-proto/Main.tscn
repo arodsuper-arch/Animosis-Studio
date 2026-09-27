@@ -1,0 +1,40 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://Region.gd" id="1_region"]
+
+[sub_resource type="Terrain3DAssets" id="Terrain3DAssets_1"]
+
+[sub_resource type="ProceduralSkyMaterial" id="Sky_1"]
+sky_horizon_color = Color(0.58, 0.61, 0.66, 1)
+ground_horizon_color = Color(0.58, 0.61, 0.66, 1)
+
+[sub_resource type="Sky" id="SkyRes_1"]
+sky_material = SubResource("Sky_1")
+
+[sub_resource type="Environment" id="Env_1"]
+background_mode = 2
+sky = SubResource("SkyRes_1")
+tonemap_mode = 3
+ssao_enabled = true
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_region")
+
+[node name="Terrain3D" type="Terrain3D" parent="."]
+assets = SubResource("Terrain3DAssets_1")
+material/world_background = 1
+collision/mode = 1
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.86, -0.32, 0.4, 0, 0.78, 0.62, -0.51, -0.54, 0.67, 0, 220, 0)
+light_energy = 1.2
+shadow_enabled = true
+directional_shadow_mode = 2
+directional_shadow_max_distance = 800.0
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env_1")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(0.92, -0.2, 0.34, 0, 0.86, 0.51, -0.39, -0.47, 0.79, 420, 260, 420)
+far = 8000.0

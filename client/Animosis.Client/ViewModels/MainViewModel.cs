@@ -1,5 +1,8 @@
 using System;
+using System.Diagnostics;
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Animosis.Client.Models;
@@ -26,9 +29,9 @@ public partial class MainViewModel : ViewModelBase
     [
         new ToolItem
         {
-            Name = "Animosis Editor", PackageId = "animosis.editor", Version = "0.5.0",
-            Initials = "AE", State = ToolState.Installed,
-            Blurb = "World authoring, scene graph and the play-in-editor runtime.",
+            Name = "Animosis Engine", PackageId = "animosis.engine", Version = "4.7.2",
+            Initials = "AE", State = ToolState.NotBuilt,
+            Blurb = "World authoring, scene graph and the play-in-editor runtime. Forked from Godot 4.7.2-stable.",
         },
         new ToolItem
         {
@@ -71,6 +74,59 @@ public partial class MainViewModel : ViewModelBase
     ];
 
     // ---- Navigation --------------------------------------------------------
+
+    public MainViewModel()
+    {
+        RefreshEngine();
+    }
+
+    [ObservableProperty]
+    private string _enginePath = "not found";
+
+    // Remembers the last resolution so repeated rescans stay silent. The window
+    // rescans every time it is activated, so logging unconditionally would bury
+    // the update log in noise.
+    private string? _lastResolved;
+
+    /// <summary>
+    /// Resolves the Animosis Engine entry against a real binary on disk. Until
+    /// the release manifest drives installs, the client discovers the engine by
+    /// convention; see EngineLocator.
+    /// </summary>
+    [RelayCommand]
+    private void RefreshEngine()
+    {
+        var engine = Tools.FirstOrDefault(t => t.PackageId == "animosis.engine");
+        if (engine is null)
+        {
+            return;
+        }
+
+        var build = EngineLocator.Find();
+
+        if (build is null)
+        {
+            engine.Resolve(ToolState.NotBuilt);
+            EnginePath = "not found — build it in engine/animosis-engine";
+            if (_lastResolved is not null)
+            {
+                Log.Add("engine: build disappeared from all search roots");
+                _lastResolved = null;
+            }
+
+            return;
+        }
+
+        engine.Resolve(ToolState.Installed, build.ExecutablePath);
+        EnginePath = build.ExecutablePath;
+
+        var stamp = $"{build.ExecutablePath}|{build.BuiltAt:O}";
+        if (_lastResolved != stamp)
+        {
+            Log.Add($"engine: {build.Variant}, {build.SizeText}, built {build.BuiltAt:yyyy-MM-dd HH:mm}");
+            _lastResolved = stamp;
+        }
+    }
 
     [ObservableProperty]
     private int _selectedPage;
@@ -269,7 +325,37 @@ public partial class MainViewModel : ViewModelBase
 
         if (tool.State == ToolState.Installed)
         {
-            Log.Add($"launch requested — {tool.PackageId} v{tool.Version}");
+            if (tool.ExecutablePath is null)
+            {
+                Log.Add($"launch requested — {tool.PackageId} v{tool.Version} (no binary bound)");
+                return;
+            }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = tool.ExecutablePath,
+                    WorkingDirectory = Path.GetDirectoryName(tool.ExecutablePath),
+                    UseShellExecute = true,
+                });
+                Log.Add($"launched {tool.PackageId} — {Path.GetFileName(tool.ExecutablePath)}");
+            }
+            catch (Exception ex)
+            {
+                // Surfaced rather than swallowed: a failed launch is the single
+                // most common thing a user will report.
+                Log.Add($"launch FAILED — {tool.PackageId}: {ex.Message}");
+                SelectedPage = 1;
+            }
+
+            return;
+        }
+
+        if (tool.State == ToolState.NotBuilt)
+        {
+            Log.Add($"{tool.PackageId} is not built — compile it, then press Rescan on Settings");
+            SelectedPage = 2;
             return;
         }
 

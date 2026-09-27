@@ -14,6 +14,7 @@
         MinWidth="900" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         WindowDecorations="None"
+        Activated="Window_Activated"
         Background="{StaticResource SurfaceBase}"
         FontFamily="{StaticResource FontSans}">
 
@@ -328,6 +329,21 @@
           <!-- Settings -->
           <StackPanel Grid.Row="1" IsVisible="{Binding IsSettings}"
                       Margin="32,24,32,24" Spacing="12">
+
+            <Border CornerRadius="10" Padding="18" Background="{StaticResource SurfaceRaised}"
+                    BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="4">
+                  <TextBlock Text="Animosis Engine binary" FontSize="13" FontWeight="SemiBold"
+                             Foreground="{StaticResource TextPrimary}" />
+                  <TextBlock Text="{Binding EnginePath}" FontSize="12"
+                             FontFamily="Consolas, monospace" TextWrapping="Wrap"
+                             Foreground="{StaticResource TextMuted}" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" Content="Rescan" VerticalAlignment="Center"
+                        Command="{Binding RefreshEngineCommand}" />
+              </Grid>
+            </Border>
 
             <Border CornerRadius="10" Padding="18" Background="{StaticResource SurfaceRaised}"
                     BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1">

@@ -21,6 +21,17 @@ public partial class MainWindow : Window
         }
     }
 
+    // Rescan whenever the window comes forward. Building the engine happens in a
+    // terminal; alt-tabbing back should be enough to pick it up, without the
+    // user knowing a Rescan button exists.
+    private void Window_Activated(object? sender, System.EventArgs e)
+    {
+        if (DataContext is ViewModels.MainViewModel vm && vm.RefreshEngineCommand.CanExecute(null))
+        {
+            vm.RefreshEngineCommand.Execute(null);
+        }
+    }
+
     private void Minimize_Click(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
     private void Close_Click(object? sender, RoutedEventArgs e) => Close();

@@ -1,0 +1,28 @@
+# ---- .NET build output -------------------------------------------------
+# These are currently TRACKED from an earlier commit, so ignoring them here
+# does not untrack them. To stop them dirtying every build:
+#   git rm -r --cached client/**/bin client/**/obj tools/**/bin tools/**/obj
+# Files stay on disk; git just stops watching them.
+bin/
+obj/
+*.user
+*.suo
+
+# ---- published client --------------------------------------------------
+dist/
+
+# ---- Godot -------------------------------------------------------------
+.godot/
+.import/
+export_presets.cfg
+
+# ---- Terrain3D ---------------------------------------------------------
+# ~51 MB of prebuilt platform binaries. Not tracked: it is a pinned upstream
+# release, and binaries of that size never leave a git history once added.
+# Version and download URL are recorded in projects/terrain-proto/README.md.
+projects/*/addons/terrain_3d/
+
+# ---- OS ----------------------------------------------------------------
+Thumbs.db
+desktop.ini
+.DS_Store

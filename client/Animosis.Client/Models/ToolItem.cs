@@ -7,6 +7,7 @@ public enum ToolState
     Installed,
     UpdateAvailable,
     NotInstalled,
+    NotBuilt,
 }
 
 /// <summary>
@@ -22,6 +23,11 @@ public partial class ToolItem : ObservableObject
 
     /// <summary>Two-letter plate initials.</summary>
     public required string Initials { get; init; }
+
+    /// <summary>Set when this tool resolves to a real binary on disk.</summary>
+    public string? ExecutablePath { get; set; }
+
+    public bool CanLaunch => ExecutablePath is not null && State == ToolState.Installed;
 
     [ObservableProperty]
     private ToolState _state = ToolState.Installed;
@@ -39,6 +45,7 @@ public partial class ToolItem : ObservableObject
         ToolState.Installed       => $"v{Version}",
         ToolState.UpdateAvailable => $"Update to {Version}",
         ToolState.NotInstalled    => "Not installed",
+        ToolState.NotBuilt        => "Not built",
         _ => string.Empty,
     };
 
@@ -47,11 +54,19 @@ public partial class ToolItem : ObservableObject
         ToolState.Installed       => "Launch",
         ToolState.UpdateAvailable => "Update",
         ToolState.NotInstalled    => "Install",
+        ToolState.NotBuilt        => "Build",
         _ => string.Empty,
     };
 
     public bool IsUpdateAvailable => State == ToolState.UpdateAvailable;
     public bool IsInstalled       => State == ToolState.Installed;
+
+    public void Resolve(ToolState state, string? executablePath = null)
+    {
+        ExecutablePath = executablePath;
+        State = state;
+        OnPropertyChanged(nameof(CanLaunch));
+    }
 
     /// <summary>Called when an update run completes successfully.</summary>
     public void MarkInstalled()

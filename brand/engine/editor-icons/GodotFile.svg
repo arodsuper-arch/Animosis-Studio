@@ -1,0 +1,5 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 256 256'>
+  <defs><linearGradient id='p' x1='0' y1='0' x2='0.6' y2='1'><stop offset='0' stop-color='#585858'/><stop offset='0.34' stop-color='#2B2B2B'/><stop offset='0.51' stop-color='#434343'/><stop offset='1' stop-color='#0C0C0C'/></linearGradient></defs>
+  <rect x='8' y='8' width='240' height='240' rx='54' fill='url(#p)'/>
+  <g transform='translate(74.40,91.50) scale(1.000)'><path fill='#C41E3A' d='M0.1 73L26.06 0.399994L29.14 0.399994L55.1 73L51.36 73L36.18 29.44Q33.87 22.84 31.835 16.845Q29.8 10.85 27.82 4.13999L27.38 4.13999Q25.4 10.85 23.365 16.845Q21.33 22.84 19.02 29.44L3.62 73L0.1 73ZM11.32 47.04L11.32 43.96L43.55 43.96L43.55 47.04L11.32 47.04ZM67.2 73L67.2 0.399994L106.14 0.399994L106.14 3.48L70.72 3.48L70.72 32.74L100.42 32.74L100.42 35.82L70.72 35.82L70.72 69.92L107.24 69.92L107.24 73L67.2 73Z'/></g>
+</svg>
