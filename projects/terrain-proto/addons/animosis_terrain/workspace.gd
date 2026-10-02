@@ -23,6 +23,8 @@ const Sculpt := preload("res://addons/animosis_terrain/sculpt.gd")
 const Grid := preload("res://addons/animosis_terrain/grid.gd")
 const Passability := preload("res://addons/animosis_terrain/passability.gd")
 const Water := preload("res://addons/animosis_terrain/water.gd")
+const Landform := preload("res://addons/animosis_terrain/landform.gd")
+const Minimap := preload("res://addons/animosis_terrain/minimap.gd")
 
 # design/tokens.css
 const SURFACE_RAIL    := Color("#0F0F0F")
@@ -58,8 +60,18 @@ var _shape_section: Control
 var _current_tool: int = 0
 var _water_section: Control
 var _water_notes: Control
+var _landform_section: Control
+var _variant_label: Label
+var _param_rows: VBoxContainer
+var _rotation_row: Control
+var _region_section: Control
+var _rail_group: ButtonGroup
+var _rail_slots: Dictionary = {}
+var _minimap: Control
+var _border_stats: Label
 var _water_rows: VBoxContainer
 var _level_slider: HSlider
+var _landform_height: HSlider
 var _level_group: ButtonGroup
 var _tool_sections: Array[Control] = []
 
@@ -256,6 +268,11 @@ func _menu_bar() -> Control:
 		# Only Region does anything yet; the rest are placeholders for layout.
 		if title == "Region":
 			var pm := m.get_popup()
+			# Size and border are properties OF the region, so they belong to
+			# the region menu rather than to the rail, which is for tools that
+			# act on ground.
+			pm.add_item("Size & Border...", 3)
+			pm.add_separator()
 			pm.add_item("Generate", 0)
 			pm.add_item("Clear", 1)
 			pm.add_separator()
@@ -293,6 +310,41 @@ func _menu_bar() -> Control:
 	return bar
 
 
+## The rail, grouped by what a tool DOES to a region rather than by when it was
+## written.
+##
+## The first group edits ground that already has a shape, or writes a layer over
+## it. The second lays a region out from whole landforms. They are different
+## scales of decision -- one is a brush, the other is a decision about where a
+## mountain is -- and mixing them in one column invites reaching for a brush
+## where a landform was the answer.
+##
+## Each entry names its own tool rather than taking one from its position, so a
+## tool can live somewhere other than the rail -- Region lives in the menu --
+## without silently shifting everything below it onto the wrong panel.
+func _rail_groups() -> Array:
+	return [
+		[
+			[Sculpt.Tool.SCULPT, "sculpt", "Sculpt  \u2014  raise and lower terrain"],
+			[Sculpt.Tool.FLATTEN, "flatten", "Flatten  \u2014  level to a height, or blur toward the local average"],
+			[Sculpt.Tool.AREA, "area", "Areas  \u2014  assign zones to the ground"],
+			[Sculpt.Tool.PASSABILITY, "passability", "Passability  \u2014  override where movement is allowed"],
+			[Sculpt.Tool.WATER, "water", "Water  \u2014  place water bodies and set their level"],
+		],
+		[
+			[Sculpt.Tool.LANDFORM, "landform", "Landforms  \u2014  lay out a region from whole rises"],
+		],
+	]
+
+
+func _rail_divider() -> Control:
+	var sep := Panel.new()
+	sep.custom_minimum_size = Vector2(RAIL_WIDTH - 20, 1)
+	sep.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	sep.add_theme_stylebox_override("panel", _sb(BORDER_DEFAULT))
+	return sep
+
+
 func _tool_rail() -> Control:
 	var rail := _panel(SURFACE_RAIL, BORDER_SUBTLE, Vector4i(0, 0, 1, 0))
 	rail.custom_minimum_size = Vector2(RAIL_WIDTH, 0)
@@ -306,34 +358,43 @@ func _tool_rail() -> Control:
 	top.custom_minimum_size = Vector2(0, 6)
 	col.add_child(top)
 
-	var tools := ButtonGroup.new()
-	var rail_tools := [
-		["sculpt",  "Sculpt  —  raise and lower terrain"],
-		["flatten", "Flatten  —  level to a height, or blur toward the local average"],
-		["area",    "Areas  —  assign zones to the ground"],
-		["passability", "Passability  —  override where movement is allowed"],
-		["water",   "Water  —  place water bodies and set their level"],
-	]
-	for i in RAIL_SLOTS:
-		var s: Button
-		if i < rail_tools.size():
-			var idx := i
-			s = _tool_slot(RAIL_WIDTH - 12, String(rail_tools[i][0]),
-				String(rail_tools[i][1]), tools, i == 0)
-			s.toggled.connect(func(on: bool) -> void:
+	# Kept, so a tool chosen from the menu can clear the rail rather than
+	# leaving a brush lit while a different panel is on screen.
+	_rail_group = ButtonGroup.new()
+	_rail_group.allow_unpress = true
+	var tools := _rail_group
+	var groups := _rail_groups()
+	var count := 0
+	for g in groups.size():
+		if g > 0:
+			# Extra air either side, so the line reads as a division rather than
+			# as one more thing in the column.
+			var above := Control.new()
+			above.custom_minimum_size = Vector2(0, 5)
+			col.add_child(above)
+			col.add_child(_rail_divider())
+			var below := Control.new()
+			below.custom_minimum_size = Vector2(0, 5)
+			col.add_child(below)
+
+		for entry in groups[g]:
+			var idx := int(entry[0])
+			var slot := _tool_slot(RAIL_WIDTH - 12, String(entry[1]),
+				String(entry[2]), tools, count == 0)
+			slot.toggled.connect(func(on: bool) -> void:
 				if on:
 					_on_tool_selected(idx))
-		else:
-			s = _slot(RAIL_WIDTH - 12)
-		s.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		col.add_child(s)
-		# Noggit groups its rail; a hairline every few slots reads the same way.
-		if i == 5 or i == 9:
-			var sep := Panel.new()
-			sep.custom_minimum_size = Vector2(RAIL_WIDTH - 20, 1)
-			sep.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-			sep.add_theme_stylebox_override("panel", _sb(BORDER_DEFAULT))
-			col.add_child(sep)
+			slot.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			col.add_child(slot)
+			_rail_slots[idx] = slot
+			count += 1
+
+	# Empty slots below, so the rail keeps its column rather than ending
+	# wherever the tools happen to stop.
+	for i in maxi(0, RAIL_SLOTS - count):
+		var blank := _slot(RAIL_WIDTH - 12)
+		blank.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		col.add_child(blank)
 
 	return rail
 
@@ -356,6 +417,10 @@ func _viewport_area() -> Control:
 	_view.brush_changed.connect(_on_brush_changed)
 	_view.water_changed.connect(_sync_level_slider)
 	_view.water_changed.connect(_report_fill)
+	_view.line_built.connect(_on_line_built)
+	_view.camera_moved.connect(func(p: Vector3) -> void:
+		if _minimap and _current_tool == Sculpt.Tool.REGION:
+			_minimap.set_camera_marker(Vector2(p.x, p.z)))
 
 	# Floating toolbar, sitting over the viewport as Noggit's does.
 	var float_bar := _panel(Color(0.06, 0.06, 0.06, 0.92), BORDER_DEFAULT, Vector4i(1, 1, 1, 1), 8)
@@ -520,6 +585,27 @@ func _properties_panel() -> Control:
 	_water_section = _water_block(col)
 	_water_section.visible = false
 
+	_tool_sections.append(_tool_section(col, "Region", [
+		["Drag a corner", "move it"],
+		["Click an edge", "add a corner there"],
+		["Right-click a corner", "remove it"],
+	], "The border says which part of the region is playable. Everything else "
+		+ "reads it: a wall is built along it, and outside it is not ground "
+		+ "anyone is meant to stand on."))
+	_tool_sections[Sculpt.Tool.REGION].visible = false
+	_region_section = _region_block(col)
+	_region_section.visible = false
+
+	_tool_sections.append(_tool_section(col, "Landforms", [
+		["Shift + LMB", "place the selected landform"],
+		["Ctrl + LMB", "place it inverted"],
+		["Shift/Ctrl + Wheel", "size"],
+	], "One operation, not a stroke. Each kind arrives at the size it wants, so "
+		+ "a mountain is a mountain rather than a large hill."))
+	_tool_sections[Sculpt.Tool.LANDFORM].visible = false
+	_landform_section = _landform_block(col)
+	_landform_section.visible = false
+
 	# Noggit folds falloff shape, selection model and input source into one
 	# "Type" list. They are unrelated axes, so they get their own groups here.
 	#
@@ -634,7 +720,8 @@ func _radio_block(options: Array, selected: int, on_changed: Callable) -> Contro
 
 ## Compact multi-column radio grid. Six shapes with full descriptions would run
 ## the panel off the screen, so the description lives in the tooltip.
-func _radio_grid(options: Array, selected: int, columns: int, on_changed: Callable) -> Control:
+func _radio_grid(options: Array, selected: int, columns: int, on_changed: Callable,
+		shared: ButtonGroup = null) -> Control:
 	var m := MarginContainer.new()
 	m.add_theme_constant_override("margin_left", 14)
 	m.add_theme_constant_override("margin_right", 14)
@@ -659,7 +746,9 @@ func _radio_grid(options: Array, selected: int, columns: int, on_changed: Callab
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	pad.add_child(grid)
 
-	var group := ButtonGroup.new()
+	# A caller splitting one choice across several grids passes its own group.
+	# Otherwise each grid keeps its own selection and two kinds read as chosen.
+	var group := shared if shared != null else ButtonGroup.new()
 	for i in options.size():
 		var cb := CheckBox.new()
 		cb.text = String(options[i][0])
@@ -772,12 +861,29 @@ func _tool_section(parent: Control, title: String, rows: Array, footer: String =
 
 func _on_tool_selected(index: int) -> void:
 	_current_tool = index
+	# Region is reached from the menu, so nothing in the rail corresponds to it.
+	# Leaving the last brush lit would say a brush was active when it is not.
+	if _rail_group:
+		if _rail_slots.has(index):
+			var slot: Button = _rail_slots[index]
+			if not slot.button_pressed:
+				slot.button_pressed = true
+		else:
+			var lit := _rail_group.get_pressed_button()
+			if lit:
+				lit.button_pressed = false
 	for i in _tool_sections.size():
 		_tool_sections[i].visible = (i == index)
 	if _areas_section:
 		_areas_section.visible = (index == Sculpt.Tool.AREA)
 	if _pass_section:
 		_pass_section.visible = (index == Sculpt.Tool.PASSABILITY)
+	if _region_section:
+		_region_section.visible = (index == Sculpt.Tool.REGION)
+		if index == Sculpt.Tool.REGION:
+			_refresh_minimap()
+	if _landform_section:
+		_landform_section.visible = (index == Sculpt.Tool.LANDFORM)
 	if _water_section:
 		_water_section.visible = (index == Sculpt.Tool.WATER)
 		if index == Sculpt.Tool.WATER:
@@ -799,6 +905,7 @@ func _on_tool_selected(index: int) -> void:
 		# world -- but it still follows the tool, so the terrain stays readable
 		# while you shape the bed it will sit in.
 		_view.set_water_overlay(index == Sculpt.Tool.WATER)
+		_view.set_border_overlay(index == Sculpt.Tool.REGION)
 
 
 ## The area tree, each entry keyed by its own colour so the list and the
@@ -1018,6 +1125,295 @@ func _update_water_hint(fill: bool) -> void:
 func _report_fill() -> void:
 	if _view and _current_tool == Sculpt.Tool.WATER and _view.water_fill_mode:
 		_set_status("scale", _view.water_fill_report())
+
+
+## Kind, size and the kind's own settings.
+##
+## Nothing below the kind list is written by hand. Each landform declares its
+## parameters and the panel builds sliders from the declaration, so adding a
+## kind -- or a tier -- costs no UI code.
+## Size, the map, and the border drawn on it.
+##
+## One tool rather than three, because they are one decision. How much ground a
+## region has, and which of it is playable, are the same question asked twice,
+## and separating them means answering the second without being able to see the
+## first.
+func _region_block(parent: Control) -> Control:
+	var wrap := VBoxContainer.new()
+	wrap.add_theme_constant_override("separation", 0)
+
+	# Size first: it rebuilds everything, so it is the decision that comes
+	# before the border rather than after it.
+	wrap.add_child(_section("Size"))
+	wrap.add_child(_radio_grid([
+		["512 m", "512", "0.26 km2. A test plot."],
+		["1 km", "1024", "1.05 km2. A compact hand-built area."],
+		["2 km", "2048", "4.19 km2. A zone."],
+		["4 km", "4096", "16.8 km2. A large zone, or a piece of a continent."],
+	], 2, 2, _on_region_size_changed))
+
+	wrap.add_child(_section("Map"))
+
+	var m := MarginContainer.new()
+	m.add_theme_constant_override("margin_left", 14)
+	m.add_theme_constant_override("margin_right", 14)
+	m.add_theme_constant_override("margin_top", 10)
+	m.add_theme_constant_override("margin_bottom", 4)
+
+	var box := _panel(SURFACE_RAISED, BORDER_SUBTLE, Vector4i(1, 1, 1, 1), 7)
+	m.add_child(box)
+
+	var pad := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		pad.add_theme_constant_override("margin_" + side, 10)
+	box.add_child(pad)
+
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 10)
+	pad.add_child(col)
+
+	_minimap = Minimap.new()
+	_minimap.custom_minimum_size = Vector2(0, PANEL_WIDTH - 62)
+	_minimap.border_changed.connect(_on_border_changed)
+	col.add_child(_minimap)
+
+	_border_stats = _label("no border", 11, TEXT_DISABLED)
+	_border_stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(_border_stats)
+
+	# Shape presets. A hand-drawn border is a dozen clicks; starting from a
+	# shape and moving four corners is two.
+	var shape_row := HBoxContainer.new()
+	shape_row.add_theme_constant_override("separation", 8)
+	shape_row.add_child(_small_button("Rectangle",
+		"Reset the border to a rectangle inside the region.",
+		func() -> void: _reset_border(false)))
+	shape_row.add_child(_small_button("Ellipse",
+		"Reset the border to a rounded shape. A wall built along one has no corners to catch on.",
+		func() -> void: _reset_border(true)))
+	col.add_child(shape_row)
+
+	var act_row := HBoxContainer.new()
+	act_row.add_theme_constant_override("separation", 8)
+	act_row.add_child(_small_button("Redraw map",
+		"Sample the terrain again. The map is rendered on request, not every frame.",
+		_refresh_minimap))
+	act_row.add_child(_small_button("Wall it",
+		"Build a Border Wall along the border. The border is already a path, so nothing has to be drawn twice.",
+		_on_wall_border))
+	col.add_child(act_row)
+
+	wrap.add_child(m)
+	parent.add_child(wrap)
+	return wrap
+
+
+func _small_button(text: String, tip: String, on_pressed: Callable) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.tooltip_text = tip
+	b.focus_mode = Control.FOCUS_NONE
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.add_theme_font_size_override("font_size", 12)
+	b.pressed.connect(on_pressed)
+	return b
+
+
+func _on_region_size_changed(key: String) -> void:
+	if _view == null:
+		return
+	_set_status("scale", "rebuilding at %s m..." % key)
+	_view.set_region_extent(int(key))
+	_refresh_minimap()
+
+
+func _reset_border(ellipse: bool) -> void:
+	if _view == null or _view.border == null:
+		return
+	if ellipse:
+		_view.border.reset_ellipse(0.80)
+	else:
+		_view.border.reset_rect(0.80)
+	_on_border_changed()
+
+
+func _refresh_minimap() -> void:
+	if _view == null or _minimap == null:
+		return
+	_minimap.border = _view.border
+	_minimap.extent = _view.region_extent()
+	_minimap.render_terrain(_view.terrain, _view.region_extent())
+	_on_border_changed()
+
+
+func _on_border_changed() -> void:
+	if _view == null:
+		return
+	if _view.border:
+		_view.border.rebuild()
+	if _border_stats:
+		_border_stats.text = _view.border_summary()
+	if _minimap:
+		_minimap.queue_redraw()
+
+
+func _on_wall_border() -> void:
+	if _view == null:
+		return
+	_set_status("scale", "building the wall...")
+	_view.build_border_wall()
+
+
+func _landform_block(parent: Control) -> Control:
+	var wrap := VBoxContainer.new()
+	wrap.add_theme_constant_override("separation", 0)
+
+	# One choice shown as two groups, so they share a button group.
+	var kind_group := ButtonGroup.new()
+
+	# Grouped by tier, because the tiers are the taxonomy rather than a way of
+	# sorting a list. Kinds with no tier yet say so instead of being filed under
+	# one they do not belong to.
+	wrap.add_child(_section("Tier 1  \u00b7  Rises"))
+	wrap.add_child(_radio_grid(_kind_rows(1), 0, 2, _on_landform_kind_changed, kind_group))
+	wrap.add_child(_section("Untiered"))
+	wrap.add_child(_radio_grid(_kind_rows(0), -1, 2, _on_landform_kind_changed, kind_group))
+
+	var m := MarginContainer.new()
+	m.add_theme_constant_override("margin_left", 14)
+	m.add_theme_constant_override("margin_right", 14)
+	m.add_theme_constant_override("margin_top", 10)
+	m.add_theme_constant_override("margin_bottom", 4)
+
+	var box := _panel(SURFACE_RAISED, BORDER_SUBTLE, Vector4i(1, 1, 1, 1), 7)
+	m.add_child(box)
+
+	var pad := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		pad.add_theme_constant_override("margin_" + side, 12)
+	box.add_child(pad)
+
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 14)
+	pad.add_child(col)
+
+	# Metres, not an abstract dial. A landform has a real size and the panel
+	# should say what it is.
+	_landform_height = _slider_row(col, "Height", 2.0, 500.0, 1.0, 32.0, " m",
+		func(v: float) -> void:
+			if _view and not _syncing:
+				_view.set_landform_height(v))
+
+	# Rotation aims a point kind. A line kind takes its angle from the path, so
+	# the control hides rather than sitting there doing nothing.
+	_rotation_row = _slider_row(col, "Rotation", 0.0, 360.0, 5.0, 0.0, "\u00b0",
+		func(v: float) -> void:
+			if _view and not _syncing:
+				_view.set_landform_rotation(v)).get_parent()
+
+	_param_rows = VBoxContainer.new()
+	_param_rows.add_theme_constant_override("separation", 14)
+	col.add_child(_param_rows)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 9)
+	_variant_label = _label("variation 1", 11, TEXT_DISABLED)
+	_variant_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_variant_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(_variant_label)
+
+	var reroll := Button.new()
+	reroll.text = "Reroll"
+	reroll.tooltip_text = "Another generated variation of the same kind, so two placed side by side are not the same one twice."
+	reroll.focus_mode = Control.FOCUS_NONE
+	reroll.pressed.connect(func() -> void:
+		if _view:
+			_variant_label.text = "variation %d" % (_view.reroll_landform() + 1))
+	row.add_child(reroll)
+	col.add_child(row)
+
+	wrap.add_child(m)
+	parent.add_child(wrap)
+	_rebuild_landform_params("mounds")
+	return wrap
+
+
+## Kinds of one tier, as the radio grid wants them.
+func _kind_rows(tier: int) -> Array:
+	var out: Array = []
+	for key in Landform.KINDS:
+		var k: Dictionary = Landform.KINDS[key]
+		if int(k["tier"]) != tier:
+			continue
+		var mark := "  \u2014  line" if int(k["origin"]) == Landform.Origin.LINE else ""
+		out.append([String(k["label"]), String(key), String(k["hint"]) + mark])
+	return out
+
+
+## Swaps the settings under the size controls for the selected kind's own.
+func _rebuild_landform_params(kind: String) -> void:
+	if _param_rows == null or not Landform.KINDS.has(kind):
+		return
+	for c in _param_rows.get_children():
+		_param_rows.remove_child(c)
+		c.queue_free()
+
+	for entry in Landform.KINDS[kind]["params"]:
+		var pd: Dictionary = entry
+		var key := String(pd["key"])
+		_slider_row(_param_rows, String(pd["label"]),
+			float(pd["min"]), float(pd["max"]), float(pd["step"]),
+			float(pd["value"]), String(pd["suffix"]),
+			func(v: float) -> void:
+				if _view and not _syncing:
+					_view.set_landform_param(key, v),
+			String(pd["hint"]))
+
+	if _rotation_row:
+		_rotation_row.visible = not Landform.is_line(kind)
+	if _water_notes:
+		pass
+	_update_landform_hint(kind)
+
+
+## The gesture differs by origin, so the legend has to as well.
+func _update_landform_hint(kind: String) -> void:
+	var notes: Control = _tool_sections[Sculpt.Tool.LANDFORM]
+	for c in notes.get_children():
+		notes.remove_child(c)
+		c.queue_free()
+	notes.add_child(_section("Landforms"))
+	if Landform.is_line(kind):
+		notes.add_child(_note_block([
+			["Shift + drag", "draw the line, release to build"],
+			["Ctrl + drag", "draw it carved instead"],
+			["Shift/Ctrl + Wheel", "width"],
+		], "A line landform is built by walking its cross-section along the path "
+			+ "you draw, which is why a bluff reads as merged lobes."))
+	else:
+		notes.add_child(_note_block([
+			["Shift + LMB", "place the landform"],
+			["Ctrl + LMB", "place it inverted"],
+			["Shift/Ctrl + Wheel", "size"],
+		], "One operation, not a stroke. Each kind arrives at the size it wants, "
+			+ "so a mountain is a mountain rather than a large hill."))
+
+
+## Picking a kind sets its size and swaps in its settings, which is the whole
+## point of the presets.
+func _on_landform_kind_changed(key: String) -> void:
+	if _view == null:
+		return
+	_view.set_landform_kind(key)
+	_syncing = true
+	if _landform_height:
+		_landform_height.value = _view.landform_height()
+	_syncing = false
+	_rebuild_landform_params(key)
+
+
+func _on_line_built(steps: int) -> void:
+	_set_status("scale", "built from %d sections" % steps)
 
 
 func _selected_body() -> int:
@@ -1289,6 +1685,8 @@ func _on_region_menu(id: int) -> void:
 			_view.refresh_grid()
 		2:
 			_view.frame_region()
+		3:
+			_on_tool_selected(Sculpt.Tool.REGION)
 
 
 func _refresh_region_status() -> void:

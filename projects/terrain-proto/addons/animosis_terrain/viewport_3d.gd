@@ -17,6 +17,8 @@ signal edit_applied(op_count: int)
 signal brush_changed(radius: float, strength: float)
 ## A water body placed or moved its own surface, so the panel has to follow.
 signal water_changed()
+## A drawn path finished building, with how many stamps it took.
+signal line_built(steps: int)
 
 const Sculpt := preload("res://addons/animosis_terrain/sculpt.gd")
 const ScaleRef := preload("res://addons/animosis_terrain/scale_ref.gd")
@@ -24,6 +26,8 @@ const Grid := preload("res://addons/animosis_terrain/grid.gd")
 const AreaLayer := preload("res://addons/animosis_terrain/area.gd")
 const PassabilityLayer := preload("res://addons/animosis_terrain/passability.gd")
 const WaterLayer := preload("res://addons/animosis_terrain/water.gd")
+const Landform := preload("res://addons/animosis_terrain/landform.gd")
+const RegionBorder := preload("res://addons/animosis_terrain/region_border.gd")
 
 const REGION_SCENE := "res://Main.tscn"
 
@@ -56,6 +60,7 @@ var grid
 var area
 var passability
 var water
+var border
 ## The layer being painted into while LMB is held, and the value being written,
 ## or null / -1 when not painting. Both layers chunk their meshes the same way,
 ## so they share one write-and-throttled-flush path rather than each having one.
@@ -65,6 +70,13 @@ var _layer_next_flush := 0.0
 ## Fill or Brush for the water tool. Fill is the default because a lake is a
 ## basin, not a shape somebody draws.
 var water_fill_mode := true
+
+## Points of the path being drawn for a line-origin landform, in world space.
+## Empty except while the mouse is down with a line kind selected.
+var _path := PackedVector3Array()
+var _path_invert := false
+var _path_line: MeshInstance3D
+var _building := false
 var _pending_mouse := Vector2.INF   ## latest cursor position awaiting a raycast
 var _last_applied := Vector3.INF    ## where the last deposit landed
 
@@ -163,6 +175,9 @@ func _load_region() -> void:
 	water = WaterLayer.new()
 	region.add_child(water)
 
+	border = RegionBorder.new()
+	region.add_child(border)
+
 	grid = Grid.new()
 	region.add_child(grid)
 	var extent: float = float(region.get("extent_m")) if "extent_m" in region else 4096.0
@@ -170,6 +185,7 @@ func _load_region() -> void:
 	area.configure(terrain, extent)
 	passability.configure(terrain, extent)
 	water.configure(terrain, extent)
+	border.configure(terrain, extent)
 
 	for k in [ScaleRef.Kind.PERSON, ScaleRef.Kind.BUILDING, ScaleRef.Kind.DRAGON]:
 		var r = ScaleRef.new(k)
@@ -259,6 +275,26 @@ func _gui_input(event: InputEvent) -> void:
 					0 if mod < 0 else area.selected_id)
 				accept_event()
 				return
+			if sculpt.tool == sculpt.Tool.LANDFORM:
+				if _building:
+					accept_event()
+					return
+				if Landform.is_line(sculpt.landform_kind):
+					# A line kind is drawn before it is built: the path is the
+					# input, and nothing touches the terrain until you let go.
+					_path = PackedVector3Array([_cursor])
+					_path_invert = mod < 0
+					_last_applied = _cursor
+					_draw_path()
+					accept_event()
+					return
+				# Point kinds are one operation, so nothing is armed for a drag.
+				sculpt.stamp(_cursor, mod < 0)
+				resolve_water()
+				refresh_grid()
+				edit_applied.emit(sculpt.operation_count())
+				accept_event()
+				return
 			if sculpt.tool == sculpt.Tool.WATER and water_fill_mode:
 				# A fill is one operation, not a stroke: it claims the whole
 				# basin at once, so there is nothing to drag.
@@ -294,6 +330,14 @@ func _gui_input(event: InputEvent) -> void:
 			edit_applied.emit(sculpt.operation_count())
 			accept_event()
 			return
+		elif not event.pressed and not _path.is_empty():
+			var pts := _path
+			_path = PackedVector3Array()
+			_draw_path()
+			_build_line(pts, _path_invert)
+			accept_event()
+			return
+
 		elif not event.pressed and (_painting or _layer_node != null):
 			if _painting:
 				# Spec §4.4: terrain moved, so every basin resolves again. Done
@@ -350,6 +394,9 @@ func _gui_input(event: InputEvent) -> void:
 			# Queue it. Mouse motion can fire several times per frame and a
 			# raycast per event is wasted work; _process resolves it once.
 			_pending_mouse = event.position
+		if not _path.is_empty():
+			accept_event()
+			return
 		if _painting or _layer_node != null:
 			# Application happens in _process, rate-limited. Doing it here meant
 			# one operate() per motion event -- at 125 Hz mouse polling and
@@ -470,6 +517,199 @@ func set_passability_paint(state: int) -> void:
 
 func passability_label(world: Vector3) -> String:
 	return passability.label_at(world) if passability else ""
+
+
+## Draws the path being dragged, following the ground so it reads as a route
+## across the terrain rather than a line hanging over it.
+func _draw_path() -> void:
+	if _path_line == null:
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = Color("#E5484D")
+		mat.no_depth_test = true
+		mat.render_priority = 3
+		_path_line = MeshInstance3D.new()
+		_path_line.name = "LandformPath"
+		_path_line.mesh = ImmediateMesh.new()
+		_path_line.material_override = mat
+		_path_line.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		if region:
+			region.add_child(_path_line)
+
+	var mesh := _path_line.mesh as ImmediateMesh
+	mesh.clear_surfaces()
+	if _path.size() < 2:
+		_path_line.visible = false
+		return
+	mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
+	for p in _path:
+		mesh.surface_add_vertex(p + Vector3.UP * 1.2)
+	mesh.surface_end()
+	_path_line.visible = true
+
+
+## Walks the drawn path, applying the cross-section at even spacing.
+##
+## Spread over frames on purpose. A border wall around a 4 km region is around
+## ninety applications, and Terrain3D's operate() blocks the main thread for
+## tens of milliseconds at that radius -- done in one go it reads as the editor
+## having hung.
+func _build_line(points: PackedVector3Array, invert: bool) -> void:
+	if sculpt == null or points.size() < 2:
+		return
+	var plan: Array = sculpt.plan_line(points)
+	if plan.is_empty():
+		return
+
+	_building = true
+	var done := 0
+	for entry in plan:
+		sculpt.apply_line_step(entry[0], entry[1], invert)
+		done += 1
+		# Yield often enough that the window keeps repainting, rarely enough
+		# that the yields are not themselves the cost.
+		if done % 4 == 0:
+			await get_tree().process_frame
+	_building = false
+
+	sculpt.log_line(points, plan.size(), invert)
+	resolve_water()
+	refresh_grid()
+	edit_applied.emit(sculpt.operation_count())
+	line_built.emit(plan.size())
+
+
+func building() -> bool:
+	return _building
+
+
+## Rebuilds the region at a new size.
+##
+## Every layer is sized from the extent, so changing it is not a setting -- it
+## is a new region. Reconfiguring them all is the honest response, and it is
+## also why this lives here rather than on the generator: the generator knows
+## about heightfields, not about the layers stacked over them.
+func set_region_extent(metres: int) -> void:
+	if region == null or not ("extent_m" in region):
+		return
+	region.set("extent_m", metres)
+	generate()
+	var e := float(metres)
+	if grid:
+		grid.configure(terrain, e)
+	if area:
+		area.configure(terrain, e)
+	if passability:
+		passability.configure(terrain, e)
+	if water:
+		water.configure(terrain, e)
+	if border:
+		# A border is a fraction of its region, so it starts again rather than
+		# hanging outside a region that just got smaller.
+		border.points = PackedVector2Array()
+		border.configure(terrain, e)
+	frame_region()
+	region_ready.emit(region)
+
+
+func region_extent() -> float:
+	if region and "extent_m" in region:
+		return float(region.get("extent_m"))
+	return 4096.0
+
+
+func set_border_overlay(on: bool) -> void:
+	if border:
+		border.set_visible_overlay(on)
+
+
+func border_summary() -> String:
+	if border == null or border.points.size() < 3:
+		return "no border"
+	return "%.2f km2 interior  %d%% of region  %d corners" % [
+		border.area_km2(), int(round(border.fraction_of_region() * 100.0)),
+		border.points.size()]
+
+
+## Builds a landform along a path using a named kind, without disturbing the
+## one the panel has selected. The border already is a path, so a wall along it
+## needs no second drawing.
+func build_line_with(kind: String, points: PackedVector3Array, invert: bool) -> void:
+	if sculpt == null or not Landform.has(kind):
+		return
+	var was_kind: String = sculpt.landform_kind
+	var was_params: Dictionary = sculpt.landform_params
+	var was_height: float = sculpt.landform_height_m
+	var was_radius: float = sculpt.radius
+
+	var k: Dictionary = Landform.KINDS[kind]
+	sculpt.landform_kind = kind
+	sculpt.landform_params = Landform.default_params(kind)
+	sculpt.landform_height_m = float(k["height"])
+	sculpt.radius = float(k["radius"])
+
+	await _build_line(points, invert)
+
+	sculpt.landform_kind = was_kind
+	sculpt.landform_params = was_params
+	sculpt.landform_height_m = was_height
+	sculpt.radius = was_radius
+
+
+func build_border_wall() -> void:
+	if border == null:
+		return
+	var path: PackedVector3Array = border.path_3d()
+	if path.size() < 3:
+		return
+	await build_line_with("border_wall", path, false)
+
+
+func set_landform_kind(kind: String) -> void:
+	if sculpt == null or not Landform.KINDS.has(kind):
+		return
+	sculpt.landform_kind = kind
+	sculpt.landform_params = Landform.default_params(kind)
+	# The kind carries the size it wants, so picking one is the whole setup.
+	var k: Dictionary = Landform.KINDS[kind]
+	sculpt.landform_height_m = float(k["height"])
+	set_brush_radius(float(k["radius"]))
+
+
+func landform_height() -> float:
+	return sculpt.landform_height_m if sculpt else 0.0
+
+
+func set_landform_height(v: float) -> void:
+	if sculpt:
+		sculpt.landform_height_m = v
+
+
+func set_landform_param(key: String, value: float) -> void:
+	if sculpt:
+		sculpt.landform_params[key] = value
+
+
+func landform_kind() -> String:
+	return sculpt.landform_kind if sculpt else ""
+
+
+func landform_is_line() -> bool:
+	return Landform.is_line(sculpt.landform_kind) if sculpt else false
+
+
+func set_landform_rotation(degrees: float) -> void:
+	if sculpt:
+		sculpt.landform_rotation = deg_to_rad(degrees)
+
+
+## Cycles to the next generated variation of the same landform, so two mountains
+## placed side by side are not the same mountain twice.
+func reroll_landform() -> int:
+	if sculpt == null:
+		return 0
+	sculpt.landform_variant = (sculpt.landform_variant + 1) % Landform.VARIANTS
+	return sculpt.landform_variant
 
 
 func set_water_overlay(on: bool) -> void:
@@ -671,6 +911,14 @@ func _process(delta: float) -> void:
 		var at := _pending_mouse
 		_pending_mouse = Vector2.INF
 		_update_cursor(at)
+
+	# The path is sampled by distance rather than per frame, so it does not
+	# gather a thousand points where the hand paused.
+	if not _path.is_empty() and _cursor.is_finite() and sculpt:
+		if _cursor.distance_to(_last_applied) > maxf(6.0, sculpt.radius * 0.25):
+			_path.append(_cursor)
+			_last_applied = _cursor
+			_draw_path()
 
 	# Writes follow the cursor; meshing follows a measured clock. A third of the
 	# brush between writes leaves no gaps at any speed a hand moves, and because

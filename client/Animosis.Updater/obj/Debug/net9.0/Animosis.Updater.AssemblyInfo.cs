@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Animosis.Updater")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0fedf7b24cd732edf8a37066b9cbde63c064d0f3")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+50229500e1f7205c28bd01228da60e9a46c29a04")]
 [assembly: System.Reflection.AssemblyProductAttribute("Animosis.Updater")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Animosis.Updater")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -44,6 +44,10 @@ func _draw() -> void:
 			_passability(s, w)
 		"water":
 			_water(s, w)
+		"landform":
+			_landform(s, w)
+		"region":
+			_region(s, w)
 		"wireframe":
 			_wireframe(s, w)
 		"contour":
@@ -163,6 +167,21 @@ func _water(s: float, w: float) -> void:
 	draw_polyline(_p([[3, 20], [7, 20]], s), colour, w, true)
 	draw_polyline(_p([[10, 20], [14, 20]], s), colour, w, true)
 	draw_polyline(_p([[17, 20], [21, 20]], s), colour, w, true)
+
+
+## Two peaks with a placement cross-hair under them: a shape you put down
+## somewhere, as against the sculpt icon which is arrows acting on a ridge.
+func _landform(s: float, w: float) -> void:
+	draw_polyline(_p([[2, 17], [9, 5], [14, 13], [16.5, 9.5], [22, 17]], s), colour, w, true)
+	draw_polyline(_p([[3, 21], [21, 21]], s), colour, w, true)
+	draw_polyline(_p([[11, 19], [11, 23]], s), colour, w * 0.8, true)
+
+
+## A bounded plot inside a frame: the region, and the playable shape in it.
+func _region(s: float, w: float) -> void:
+	draw_polyline(_p([[3, 3], [21, 3], [21, 21], [3, 21], [3, 3]], s), colour, w * 0.8, true)
+	draw_polyline(_p([[7, 8], [12, 6], [18, 10], [16, 17], [9, 18], [7, 8]],
+		s), colour, w, true)
 
 
 func _wireframe(s: float, w: float) -> void:

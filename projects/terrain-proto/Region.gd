@@ -17,7 +17,7 @@ const HEIGHT_CHANNEL := 0  ## import_images() takes [height, control, colour]
 @export_group("Region")
 ## Metres across. 4096 m matches the spec's tiling model: large enough to be a
 ## real play space, small enough that precision is never in question.
-@export var extent_m: int = 4096:
+@export var extent_m: int = 2048:
 	set(v):
 		extent_m = maxi(256, v)
 		_refresh_derived()

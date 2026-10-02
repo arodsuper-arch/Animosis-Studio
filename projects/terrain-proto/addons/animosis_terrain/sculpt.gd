@@ -7,6 +7,8 @@ extends RefCounted
 ## save and multi-user sync all will, and recording from the first stroke is what
 ## keeps those cheap instead of a rewrite.
 
+const Landform := preload("res://addons/animosis_terrain/landform.gd")
+
 const BRUSH_DIR := "res://addons/terrain_3d/brushes/"
 
 ## Falloff shapes, measured from the actual brush images rather than guessed.
@@ -42,6 +44,11 @@ enum Tool {
 	WATER,     ## Shift paints the selected body's footprint, Ctrl erases it.
 	           ## Where the water lands inside that footprint is the ground's
 	           ## decision, not the brush's.
+	REGION,    ## The region itself: how much ground there is, and which part
+	           ## of it is the playable interior. Edited on a map, not in the
+	           ## 3D view -- you cannot see a 4 km decision from inside it.
+	LANDFORM,  ## Shift places the selected landform, Ctrl places it inverted.
+	           ## One operation, not a stroke.
 }
 
 var tool: Tool = Tool.SCULPT
@@ -106,6 +113,16 @@ var _OP_AVERAGE := 3
 ## Target level for a flatten stroke, sampled where the stroke began so that
 ## "flatten" means "bring this to the height I clicked on".
 var _flatten_height: float = 0.0
+
+## Landform selection. Height is in METRES here, unlike the sculpt strength
+## dial: a mountain is three hundred metres tall, and saying so is clearer than
+## discovering it on an arbitrary 1-100 scale.
+var landform_kind: String = "mounds"
+var landform_variant: int = 0
+var landform_height_m: float = 32.0
+var landform_rotation: float = 0.0
+## Per-kind settings, keyed as the kind declares them.
+var landform_params: Dictionary = Landform.default_params("mounds")
 
 
 static func _editor_const(constant: String, fallback: int) -> int:
@@ -303,6 +320,112 @@ func begin(world: Vector3, secondary: bool) -> void:
 		"radius": radius,
 		"strength": _effective_strength(),
 		"falloff": SHAPES.get(shape, "circle2"),
+		"seq": _seq,
+	})
+
+
+## Places a landform in a single operation.
+##
+## The brush IS the landform: Terrain3D multiplies strength by a brush image, so
+## handing it a mountain-shaped image and applying once puts a mountain there.
+## No new write path, and the heightfield work happens in C++.
+##
+## `align_to_view` is what lets the angle through -- Terrain3D only rotates the
+## brush when it is set, and then uses the value passed to operate() as the
+## angle. Sculpting leaves it off because a radial falloff has no orientation to
+## get wrong; a range very much does.
+func stamp(world: Vector3, invert: bool) -> void:
+	if _editor == null or not world.is_finite():
+		return
+	var up := Landform.raises(landform_kind) != invert
+
+	_apply_stamp(world, landform_rotation, up)
+
+	_seq += 1
+	operations.append({
+		"op": "landform",
+		"kind": landform_kind,
+		"variant": landform_variant,
+		"params": landform_params.duplicate(),
+		"at": [snappedf(world.x, 0.01), snappedf(world.z, 0.01)],
+		"radius": radius,
+		"height": landform_height_m,
+		"rotation": snappedf(landform_rotation, 0.001),
+		"invert": invert,
+		"seq": _seq,
+	})
+
+
+## One oriented application of the current landform brush. Shared by the point
+## gesture and by every step of a drawn path.
+func _apply_stamp(world: Vector3, angle: float, up: bool) -> void:
+	var bd := _brush_data(not up)
+	bd["brush"] = Landform.brush_for(landform_kind, landform_variant, landform_params)
+	bd["size"] = radius * 2.0
+	bd["strength"] = landform_height_m * Landform.STRENGTH_PER_METRE
+	bd["align_to_view"] = true
+
+	_editor.set_tool(_TOOL_SCULPT)
+	_editor.set_operation(_OP_ADD if up else _OP_SUBTRACT)
+	_editor.set_brush_data(bd)
+	_editor.start_operation(world)
+	_editor.operate(world, angle)
+	_editor.stop_operation()
+
+
+## Resamples a drawn path at even spacing and returns [position, angle] pairs.
+##
+## Even spacing is the point. A hand-drawn path has samples bunched wherever the
+## cursor slowed, and stamping those directly builds the formation higher where
+## somebody hesitated.
+func plan_line(points: PackedVector3Array) -> Array:
+	var out: Array = []
+	if points.size() < 2 or _editor == null:
+		return out
+
+	var step := maxf(4.0, radius * 2.0 * Landform.LINE_STEP)
+	var carry := 0.0
+	for i in points.size() - 1:
+		var a := points[i]
+		var b := points[i + 1]
+		var seg := Vector2(b.x - a.x, b.z - a.z)
+		var length := seg.length()
+		if length < 0.001:
+			continue
+		# Perpendicular to the path: the cross-section runs across it, and the
+		# brush is authored with its own length along x.
+		var angle := -atan2(seg.y, seg.x)
+		var travelled := carry
+		while travelled < length:
+			var t := travelled / length
+			out.append([a.lerp(b, t), angle])
+			travelled += step
+		carry = travelled - length
+
+	out.append([points[points.size() - 1], out[out.size() - 1][1] if out.size() > 0 else 0.0])
+	return out
+
+
+## Applies one planned step. Driven from the viewport so a long path can spread
+## itself over frames instead of locking the editor.
+func apply_line_step(at: Vector3, angle: float, invert: bool) -> void:
+	if _editor == null or not at.is_finite():
+		return
+	_apply_stamp(at, angle, Landform.raises(landform_kind) != invert)
+
+
+func log_line(points: PackedVector3Array, steps: int, invert: bool) -> void:
+	_seq += 1
+	operations.append({
+		"op": "landform_line",
+		"kind": landform_kind,
+		"variant": landform_variant,
+		"params": landform_params.duplicate(),
+		"path": points,
+		"steps": steps,
+		"radius": radius,
+		"height": landform_height_m,
+		"invert": invert,
 		"seq": _seq,
 	})
 
