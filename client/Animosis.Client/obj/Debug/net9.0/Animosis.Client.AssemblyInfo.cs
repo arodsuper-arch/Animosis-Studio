@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Animosis Studio")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("0.3.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.3.0+50229500e1f7205c28bd01228da60e9a46c29a04")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.3.0+0aeec6434bd81397d76759f8279e92c6dae16169")]
 [assembly: System.Reflection.AssemblyProductAttribute("Animosis")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Animosis")]
 [assembly: System.Reflection.AssemblyVersionAttribute("0.3.0.0")]
